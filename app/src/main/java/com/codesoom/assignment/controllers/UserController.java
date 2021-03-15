@@ -2,10 +2,12 @@ package com.codesoom.assignment.controllers;
 
 import com.codesoom.assignment.application.UserService;
 import com.codesoom.assignment.domain.User;
+import com.codesoom.assignment.domain.UserRepository;
 import com.codesoom.assignment.dto.UserCreateRequestDto;
 import com.codesoom.assignment.dto.UserUpdateRequestDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,6 +30,7 @@ import javax.validation.Valid;
 @RequiredArgsConstructor
 public class UserController {
     private final UserService userService;
+    private UserRepository userRepository;
 
     /**
      * 사용자 조회 요청을 처리하고, 해당 사용자 정보를 반환합니다.
@@ -66,11 +69,13 @@ public class UserController {
      * @return 수정된 사용자 정보
      */
     @RequestMapping(value = "{id}", method = {RequestMethod.PUT, RequestMethod.PATCH})
+    @PreAuthorize("isAuthenticated()")
     User update(
             @PathVariable Long id,
             @RequestBody @Valid UserUpdateRequestDto updateRequest
     ) {
-        User user = userService.updateUser(id, updateRequest);
+        Long userId = id;
+        User user = userService.updateUser(id, updateRequest, userId);
 
         return User.builder()
                 .id(user.getId())

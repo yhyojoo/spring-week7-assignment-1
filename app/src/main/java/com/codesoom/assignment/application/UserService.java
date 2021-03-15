@@ -64,9 +64,11 @@ public class UserService {
      *
      * @param id
      * @param updateRequest
+     * @param userId
      * @return 수정된 사용자
      */
-    public User updateUser(Long id, UserUpdateRequestDto updateRequest) {
+    public User updateUser(Long id, UserUpdateRequestDto updateRequest, Long userId
+    ) {
         User user = findUser(id);
 
         user.updateWith(mapper.map(updateRequest, User.class));

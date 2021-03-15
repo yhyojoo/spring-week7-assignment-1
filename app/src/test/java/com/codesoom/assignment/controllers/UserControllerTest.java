@@ -44,6 +44,9 @@ class UserControllerTest {
     private static final Long EXIST_ID = 1L;
     private static final Long NOT_EXIST_ID = 100L;
 
+    private static final String MY_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjF9.ZZ3CUl0jxeLGvQ1Js5nG2Ty5qGTlqai5ubDMXZOdaDk";
+    private static final String OTHER_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjJ9.TEM6MULsZeqkBbUKziCR4Dg_8kymmZkyxsCXlfNJ3g0";
+
     private static final String NAME = "양효주";
     private static final String EMAIL = "yhyojoo@codesoom.com";
     private static final String PASSWORD = "112233!!";
@@ -75,13 +78,13 @@ class UserControllerTest {
         given(userService.createUser(any(UserCreateRequestDto.class)))
                 .willReturn(user);
 
-        given(userService.updateUser(eq(EXIST_ID), any(UserUpdateRequestDto.class)))
+        given(userService.updateUser(eq(EXIST_ID), any(UserUpdateRequestDto.class), eq(EXIST_ID)))
                 .willReturn(updatedUser);
 
-        given(userService.updateUser(eq(NOT_EXIST_ID), any(UserUpdateRequestDto.class)))
+        given(userService.updateUser(eq(NOT_EXIST_ID), any(UserUpdateRequestDto.class), eq(NOT_EXIST_ID)))
                 .willThrow(new UserNotFoundException(NOT_EXIST_ID));
 
-        given(userService.deleteUser(NOT_EXIST_ID))
+        given(userService.deleteUser(eq(NOT_EXIST_ID)))
                 .willThrow(new UserNotFoundException(NOT_EXIST_ID));
     }
 
@@ -108,14 +111,12 @@ class UserControllerTest {
             void it_returns_user_and_created() throws Exception {
                 mockMvc.perform(
                         post("/users")
-                                .accept(MediaType.APPLICATION_JSON_UTF8)
-                                .contentType(MediaType.APPLICATION_JSON_VALUE)
+                                .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(createRequest))
                 )
                         .andExpect(status().isCreated())
                         .andExpect(jsonPath("name").value(NAME))
-                        .andExpect(jsonPath("email").value(EMAIL))
-                        .andExpect(jsonPath("password").value(PASSWORD));
+                        .andExpect(jsonPath("email").value(EMAIL));
 
                 verify(userService).createUser(any(UserCreateRequestDto.class));
             }
@@ -139,8 +140,7 @@ class UserControllerTest {
             void it_returns_bad_request() throws Exception {
                 mockMvc.perform(
                         post("/users")
-                                .accept(MediaType.APPLICATION_JSON_UTF8)
-                                .contentType(MediaType.APPLICATION_JSON_VALUE)
+                                .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(invalidAttributes))
                 )
                         .andExpect(status().isBadRequest());
@@ -151,6 +151,7 @@ class UserControllerTest {
     @Nested
     @DisplayName("update 메소드는")
     class Describe_update {
+        Long userId;
         UserUpdateRequestDto invalidAttributes;
 
         @Nested
@@ -165,6 +166,8 @@ class UserControllerTest {
                         .build();
 
                 givenValidId = EXIST_ID;
+
+                userId = EXIST_ID;
             }
 
             @Test
@@ -172,15 +175,14 @@ class UserControllerTest {
             void it_returns_user_and_ok() throws Exception {
                 mockMvc.perform(
                         patch("/users/1")
-                                .accept(MediaType.APPLICATION_JSON_UTF8)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(updateRequest))
+                                .header("Authorization", "Bearer " + MY_TOKEN)
                 )
                         .andExpect(status().isOk())
-                        .andExpect(jsonPath("email").value(UPDATE_EMAIL))
-                        .andExpect(jsonPath("password").value(UPDATE_PASSWORD));
+                        .andExpect(jsonPath("email").value(UPDATE_EMAIL));
 
-                verify(userService).updateUser(eq(givenValidId), any(UserUpdateRequestDto.class));
+                verify(userService).updateUser(eq(givenValidId), any(UserUpdateRequestDto.class), eq(userId));
             }
         }
 
@@ -197,6 +199,8 @@ class UserControllerTest {
                         .build();
 
                 givenInvalidId = NOT_EXIST_ID;
+
+                userId = NOT_EXIST_ID;
             }
 
             @Test
@@ -206,10 +210,11 @@ class UserControllerTest {
                         patch("/users/100")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(updateRequest))
+                                .header("Authorization", "Bearer " + MY_TOKEN)
                 )
                         .andExpect(status().isNotFound());
 
-                verify(userService).updateUser(eq(givenInvalidId), any(UserUpdateRequestDto.class));
+                verify(userService).updateUser(eq(givenInvalidId), any(UserUpdateRequestDto.class), eq(userId));
             }
         }
 
@@ -230,11 +235,60 @@ class UserControllerTest {
             void it_returns_bad_request() throws Exception {
                 mockMvc.perform(
                         patch("/users/1")
-                                .accept(MediaType.APPLICATION_JSON_UTF8)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(invalidAttributes))
+                                .header("Authorization", "Bearer " + MY_TOKEN)
                 )
                         .andExpect(status().isBadRequest());
+            }
+        }
+
+        @Nested
+        @DisplayName("토큰이 주어지지 않는다면")
+        class Context_without_access_token {
+
+            @BeforeEach
+            void setUp() {
+                updateRequest = UserUpdateRequestDto.builder()
+                        .email(UPDATE_EMAIL)
+                        .password(UPDATE_PASSWORD)
+                        .build();
+            }
+
+            @Test
+            @DisplayName("응답코드 401을 반환한다")
+            void it_returns_unauthorized() throws Exception {
+                mockMvc.perform(
+                        patch("/users/1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(updateRequest))
+                )
+                        .andExpect(status().isUnauthorized());
+            }
+        }
+
+        @DisplayName("타인의 토큰으로 접근한다면")
+        class Context_without_others_access_token {
+
+            @BeforeEach
+            void setUp() {
+                updateRequest = UserUpdateRequestDto.builder()
+                        .email(UPDATE_EMAIL)
+                        .password(UPDATE_PASSWORD)
+                        .build();
+            }
+
+            @Test
+            @DisplayName("응답코드 403을 반환한다")
+            void it_returns_forbidden() throws Exception {
+                mockMvc.perform(
+                        patch("/users/1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(updateRequest))
+                                .header("Authorization", "Bearer " + OTHER_TOKEN)
+
+                )
+                        .andExpect(status().isForbidden());
             }
         }
     }

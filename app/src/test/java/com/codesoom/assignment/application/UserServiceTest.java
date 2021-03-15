@@ -47,6 +47,7 @@ class UserServiceTest {
     private User user;
     private Long givenValidId;
     private Long givenInvalidId;
+    private Long userId;
 
     @BeforeEach
     void setUp() {
@@ -155,12 +156,14 @@ class UserServiceTest {
                         .email(UPDATE_EMAIL)
                         .password(UPDATE_PASSWORD)
                         .build();
+
+                userId = givenValidId;
             }
 
             @Test
             @DisplayName("해당 ID를 갖는 사용자의 정보를 수정한다")
             void it_updates_user() {
-                updatedUser = userService.updateUser(givenValidId, updateRequest);
+                updatedUser = userService.updateUser(givenValidId, updateRequest, userId);
 
                 verify(userRepository).findById(givenValidId);
 
@@ -175,12 +178,14 @@ class UserServiceTest {
             @BeforeEach
             void setUp() {
                 givenInvalidId = NOT_EXIST_ID;
+
+                userId = givenInvalidId;
             }
 
             @Test
             @DisplayName("수정할 사용자를 찾을 수 없다는 예외를 던진다")
             void it_throws_exception() {
-                assertThatThrownBy(() -> userService.updateUser(givenInvalidId, updateRequest))
+                assertThatThrownBy(() -> userService.updateUser(givenInvalidId, updateRequest, userId))
                         .isInstanceOf(UserNotFoundException.class);
             }
         }
